@@ -5,11 +5,17 @@ assets) so it opens standalone and prints cleanly to PDF from a browser.
 from __future__ import annotations
 
 import html
+import sys
 from datetime import datetime
 from pathlib import Path
 
-from .executor import ExecutionResult
-from .state import ScenarioState
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from breachchain.executor import ExecutionResult
+    from breachchain.state import ScenarioState
+else:
+    from .executor import ExecutionResult
+    from .state import ScenarioState
 
 _STYLE = """
 :root {
@@ -18,7 +24,7 @@ _STYLE = """
 }
 * { box-sizing: border-box; }
 body {
-  font-family: -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, Segoe UI, "Malgun Gothic", Helvetica, Arial, sans-serif;
   color: var(--fg); background: var(--bg);
   max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.5;
 }
@@ -44,9 +50,6 @@ table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; font-size: 0
 th, td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
 th { background: var(--accent); }
 ul { margin: 0.3rem 0; padding-left: 1.3rem; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #1e1e1e; --fg: #e6e6e6; --muted: #999; --border: #3a3a3a; --code-bg: #2a2a2a; --accent: #2a2a2a; }
-}
 @media print {
   body { margin: 0; max-width: 100%; }
   .step { break-inside: avoid; }
@@ -70,29 +73,29 @@ def render_report_html(
 
     parts = [
         "<!doctype html>",
-        "<html lang=\"en\"><head><meta charset=\"utf-8\">",
+        "<html lang=\"ko\"><head><meta charset=\"utf-8\">",
         f"<title>{_esc(scenario_name)}</title>",
         f"<style>{_STYLE}</style></head><body>",
         f"<h1>{_esc(scenario_name)}</h1>",
-        f"<p class=\"subtitle\">Generated {_esc(generated_at)}</p>",
-        "<h2>Summary</h2>",
+        f"<p class=\"subtitle\">생성 시각: {_esc(generated_at)}</p>",
+        "<h2>요약</h2>",
         "<div class=\"summary\">",
-        f"<div class=\"stat\"><div class=\"value\">{total}</div><div class=\"label\">Steps executed</div></div>",
-        f"<div class=\"stat\"><div class=\"value\">{succeeded}/{total}</div><div class=\"label\">Succeeded</div></div>",
-        f"<div class=\"stat\"><div class=\"value\">{coverage['technique_count']}</div><div class=\"label\">ATT&amp;CK techniques covered</div></div>",
+        f"<div class=\"stat\"><div class=\"value\">{total}</div><div class=\"label\">실행 단계</div></div>",
+        f"<div class=\"stat\"><div class=\"value\">{succeeded}/{total}</div><div class=\"label\">성공</div></div>",
+        f"<div class=\"stat\"><div class=\"value\">{coverage['technique_count']}</div><div class=\"label\">ATT&amp;CK 커버 기법 수</div></div>",
         "</div>",
     ]
 
-    parts.append("<h2>Execution Chain</h2>")
+    parts.append("<h2>실행 체인</h2>")
     for i, r in enumerate(results, start=1):
-        status = "PASS" if r.success else "FAIL"
+        status = "성공" if r.success else "실패"
         badge_cls = "pass" if r.success else "fail"
         parts.append("<div class=\"step\">")
         parts.append(
             f"<div class=\"step-title\">Step {i}: [{_esc(r.technique_id)}] {_esc(r.display_name)}"
             f"<span class=\"badge {badge_cls}\">{status}</span></div>"
         )
-        parts.append(f"<div class=\"meta\">Target: <code>{_esc(r.target_name)}</code> &middot; Duration: {r.duration_s}s</div>")
+        parts.append(f"<div class=\"meta\">대상: <code>{_esc(r.target_name)}</code> &middot; 소요 시간: {r.duration_s}s</div>")
         parts.append(f"<span class=\"cmd\">{_esc(r.command.strip())}</span>")
         if r.stdout.strip():
             parts.append(f"<pre>{_esc(r.stdout.strip())}</pre>")
@@ -100,24 +103,24 @@ def render_report_html(
             parts.append(f"<pre class=\"err\">{_esc(r.stderr.strip())}</pre>")
         parts.append("</div>")
 
-    parts.append("<h2>Accumulated State</h2>")
-    parts.append("<h3>Assets</h3><ul>")
+    parts.append("<h2>누적 상태</h2>")
+    parts.append("<h3>확보 자산</h3><ul>")
     for a in state.assets:
-        parts.append(f"<li><code>{_esc(a.name)}</code> ({_esc(a.kind)}) — discovered via {_esc(a.discovered_via)}</li>")
+        parts.append(f"<li><code>{_esc(a.name)}</code> ({_esc(a.kind)}) — {_esc(a.discovered_via)}에서 발견</li>")
     parts.append("</ul>")
-    parts.append("<h3>Credentials</h3><ul>")
+    parts.append("<h3>확보 자격정보</h3><ul>")
     for c in state.credentials:
         parts.append(
-            f"<li><code>{_esc(c.identity)}</code> from <code>{_esc(c.source_asset)}</code> — discovered via {_esc(c.discovered_via)}</li>"
+            f"<li><code>{_esc(c.identity)}</code> (출처: <code>{_esc(c.source_asset)}</code>) — {_esc(c.discovered_via)}에서 발견</li>"
         )
     parts.append("</ul>")
-    parts.append("<h3>Access Gained</h3><ul>")
+    parts.append("<h3>획득 접근 권한</h3><ul>")
     for a in state.access:
-        parts.append(f"<li><code>{_esc(a.level)}</code> on <code>{_esc(a.asset)}</code> — via {_esc(a.discovered_via)}</li>")
+        parts.append(f"<li><code>{_esc(a.asset)}</code>에 대한 <code>{_esc(a.level)}</code> 권한 — {_esc(a.discovered_via)}로 획득</li>")
     parts.append("</ul>")
 
-    parts.append("<h2>ATT&amp;CK Coverage</h2>")
-    parts.append("<table><tr><th>Technique</th><th>Name</th><th>Attempts</th><th>Successes</th><th>Targets</th></tr>")
+    parts.append("<h2>ATT&amp;CK 커버리지</h2>")
+    parts.append("<table><tr><th>기법</th><th>이름</th><th>시도</th><th>성공</th><th>대상</th></tr>")
     for t in coverage["techniques"]:
         targets = ", ".join(t["targets"])
         parts.append(
@@ -130,8 +133,12 @@ def render_report_html(
     return "\n".join(parts)
 
 
-def report_filename(prefix: str = "report") -> str:
-    return f"{prefix}_{datetime.now().strftime('%y%m%d_%H%M')}.html"
+def run_timestamp() -> str:
+    return datetime.now().strftime("%y%m%d_%H%M%S")
+
+
+def report_filename(timestamp: str, prefix: str = "report") -> str:
+    return f"{prefix}_{timestamp}.html"
 
 
 def save_report(report_html: str, path: Path) -> None:

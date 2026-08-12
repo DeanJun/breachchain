@@ -6,3 +6,4 @@ venv/
 runs/*.jsonl
 runs/*.json
 reports/
+logs/

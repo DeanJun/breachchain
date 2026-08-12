@@ -7,9 +7,14 @@ from the execution results, which already carry the technique_id.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-from .executor import ExecutionResult
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from breachchain.executor import ExecutionResult
+else:
+    from .executor import ExecutionResult
 
 
 def build_coverage(results: list[ExecutionResult]) -> dict:

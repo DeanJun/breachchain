@@ -6,8 +6,13 @@ import json
 import sys
 from pathlib import Path
 
-from .executor import Target, execute
-from .loader import load_by_technique
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from breachchain.executor import Target, execute
+    from breachchain.loader import load_by_technique
+else:
+    from .executor import Target, execute
+    from .loader import load_by_technique
 
 DEFAULT_DEFINITIONS_DIR = Path(__file__).resolve().parents[2] / "definitions"
 DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[2] / "runs"

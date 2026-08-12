@@ -150,13 +150,27 @@ ATT&CK의 Tactic 순서(Initial Access → ... → Impact)가 진단 시나리�
 
 ---
 
+## 6.5 전술(Tactic) 기반 기법 순환 — 아직 구현 안 됨 (중요, 자주 헷갈리는 지점)
+
+**질문**: "전술에 맞게 기법들을 돌아가면서 테스트하게 되어있나?" → **아니다.**
+
+지금 `scenario.py`는 손수 고른 8개 절차 중 5개를 **고정된 순서로만** 실행한다 (T1552.001 → T1078 → T1083 → T1005 → T1070.004). Tactic(Initial Access, Credential Access, Discovery, Lateral Movement...) 개념 자체가 코드 어디에도 없고, "이 전술 단계에서 후보 기법 중 하나를 골라 시도한다" 같은 로직도 없다.
+
+전술별 순환 테스트가 되려면 두 가지가 필요하다:
+1. **기법 ↔ tactic 매핑**: 지금 `definitions/*.yaml`, `art_loader.py`가 파싱하는 ART 데이터 어디에도 tactic 필드가 없다. `mitreattack-python`으로 STIX 데이터셋(enterprise-attack)을 파싱해야 technique_id → tactic 매핑을 얻을 수 있음 (5.5절에서 계획만 하고 미구현).
+2. **상태 기반 분기 로직** (바로 아래 7-1번) — tactic 매핑이 있어도, "현재 상태에서 이 tactic 단계의 후보들 중 실행 가능한 것"을 골라내는 로직이 없으면 순환이 안 됨.
+
+즉 지금은 "ATT&CK 전술 순서를 흉내낸 하드코딩된 5단계"이지, "전술별로 기법을 순환 시도하는 엔진"이 아니다. 아래 7-1, 7-2를 합치면 자연스럽게 이 기능이 나온다.
+
+---
+
 ## 7. 남은 작업 (우선순위 순)
 
 1. **상태 기반 분기 로직 (최우선, 핵심 차별점)** — 지금 `scenario.py`는 5단계가 하드코딩된 순서. `requires`/`provides`를 절차 정의에 선언하고, 현재 `state.py`의 assets/credentials/access와 대조해 "지금 실행 가능한 후보"를 계산하는 `eligible_procedures()` 함수가 필요. 후보가 여럿이면 자동 우선순위 시도 또는 사용자 선택. 후보가 없으면 dead-end로 리포트에 기록.
    - 설계 스펙: YAML에 `requires: [credential, "access:user"]`, `provides: [access:user]` 형태로 선언
    - 이 로직이 붙어야 "그냥 스크립트"에서 "진단 자동화 도구"로 넘어감
 
-2. **art_loader.py의 232개 후보를 오케스트레이터에 연결** — 지금은 파싱/필터링만 하고 실행 경로에 안 붙어 있음. 1번의 `requires`/`provides` 스펙을 이 후보들에도 적용해야 함 (현재 ART YAML엔 없는 필드라 추가 매핑 작업 필요)
+2. **art_loader.py의 232개 후보를 오케스트레이터에 연결 + tactic 매핑 추가** — 지금은 파싱/필터링만 하고 실행 경로에 안 붙어 있음. 1번의 `requires`/`provides` 스펙을 이 후보들에도 적용하고, `mitreattack-python`으로 technique_id → tactic 매핑을 붙여야 "전술별 순환"이 실제로 가능해짐 (현재 ART YAML엔 없는 필드라 추가 매핑 작업 필요)
 
 3. **블라인드 시딩** — 본인이 미리 정답(자격정보 위치 등)을 아는 상태로 테스트하면 "진단 능력"을 증명하지 못한다는 문제의식에서 나온 방향. 별도 시드 스크립트가 무작위로 자격정보/파일 위치를 정하고, 그 결과를 안 본 채로 도구를 실행해 "실제로 탐색해서 찾아냈다"는 서사를 만듦. 미착수.
 

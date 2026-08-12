@@ -1,0 +1,16 @@
+attack_technique: T1005
+display_name: Data from Local System
+description: >
+  Read the contents of the goal file on the internal node, representing
+  successful reach of the final scenario objective.
+platforms: [linux]
+input_arguments:
+  target_file:
+    description: Path to the goal file to read
+    type: path
+    default: /opt/breachchain-target/objective.txt
+executor:
+  type: sh
+  timeout: 10
+  command: |
+    cat #{target_file} 2>/dev/null || true

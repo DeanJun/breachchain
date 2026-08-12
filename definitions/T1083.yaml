@@ -1,0 +1,16 @@
+attack_technique: T1083
+display_name: File and Directory Discovery
+description: >
+  Enumerate the target directory on the internal node to locate the goal
+  file/asset for this scenario.
+platforms: [linux]
+input_arguments:
+  search_path:
+    description: Directory to enumerate on the internal node
+    type: path
+    default: /opt/breachchain-target
+executor:
+  type: sh
+  timeout: 15
+  command: |
+    find #{search_path} -maxdepth 3 -printf "%y %m %p\n" 2>/dev/null || true

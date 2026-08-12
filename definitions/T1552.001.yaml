@@ -1,0 +1,17 @@
+attack_technique: T1552.001
+display_name: Credentials In Files
+description: >
+  Search accessible configuration files for plaintext credential strings
+  (password/secret/pwd/token key-value pairs). Represents the initial
+  credential-harvesting step on the starting node.
+platforms: [linux]
+input_arguments:
+  search_path:
+    description: Directory to search for credential strings
+    type: path
+    default: /etc/breachchain-demo
+executor:
+  type: sh
+  timeout: 15
+  command: |
+    grep -RInE "(password|passwd|secret|pwd|token)[[:space:]]*[:=]" #{search_path} 2>/dev/null || true

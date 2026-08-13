@@ -81,6 +81,21 @@ class AtomicTest:
     def is_destructive(self) -> bool:
         return bool(_DESTRUCTIVE_RE.search(self.command))
 
+    def cleanup_command_resolved(self, overrides: dict[str, str] | None = None) -> str | None:
+        if not self.cleanup_command:
+            return None
+        overrides = overrides or {}
+        values = {
+            name: overrides.get(name, spec.get("default"))
+            for name, spec in self.input_arguments.items()
+        }
+
+        def _sub(match: re.Match) -> str:
+            var = match.group(1)
+            return str(values.get(var, ""))
+
+        return _VAR_PATTERN.sub(_sub, self.cleanup_command)
+
 
 def _parse_test(technique_id: str, technique_display_name: str, path: Path, raw_test: dict) -> AtomicTest | None:
     executor = raw_test.get("executor") or {}
@@ -157,6 +172,52 @@ def coverage_summary(tests: list[AtomicTest]) -> dict:
         "by_executor": by_executor,
         "elevation_required_count": sum(1 for t in tests if t.elevation_required),
     }
+
+
+def _default_candidates_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "runs" / "art_safe_candidates.json"
+
+
+def load_candidates(path: Path | None = None) -> list[AtomicTest]:
+    """Load the safety-filtered candidate list saved by `main()` (art_safe_candidates.json),
+    rehydrated as AtomicTest so callers can use resolve_command()/cleanup_command_resolved().
+    """
+    path = path or _default_candidates_path()
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found. Run: sh scripts/fetch_atomics.sh && python -m breachchain.art_loader"
+        )
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        AtomicTest(
+            technique_id=d["technique_id"],
+            technique_display_name=d["technique_display_name"],
+            test_name=d["test_name"],
+            guid=d["guid"],
+            description="",
+            platforms=d["platforms"],
+            executor_name=d["executor_name"],
+            command=d["command"],
+            cleanup_command=d.get("cleanup_command"),
+            elevation_required=False,
+            input_arguments=d.get("input_arguments") or {},
+        )
+        for d in raw
+    ]
+
+
+def find_candidate(candidates: list[AtomicTest], technique_id: str, guid: str | None = None) -> AtomicTest:
+    matches = [c for c in candidates if c.technique_id == technique_id]
+    if guid:
+        matches = [c for c in matches if c.guid == guid]
+    if not matches:
+        raise LookupError(f"no candidate found for technique={technique_id} guid={guid}")
+    if len(matches) > 1:
+        options = ", ".join(f"{c.guid}({c.test_name})" for c in matches)
+        raise LookupError(
+            f"multiple candidates for technique={technique_id}, pass --guid to disambiguate: {options}"
+        )
+    return matches[0]
 
 
 def _default_atomics_dir() -> Path:

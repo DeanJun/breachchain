@@ -66,6 +66,12 @@ def render_report_html(
     state: ScenarioState,
     coverage: dict,
     scenario_name: str = "breachchain scenario run",
+    step_tactics: list[str] | None = None,
+    recon: dict | None = None,
+    bruteforce: dict | None = None,
+    web_recon: dict | None = None,
+    vuln_scan: dict | None = None,
+    kisa: dict | None = None,
 ) -> str:
     total = len(results)
     succeeded = sum(1 for r in results if r.success)
@@ -86,8 +92,134 @@ def render_report_html(
         "</div>",
     ]
 
+    if recon is not None:
+        open_ports = recon.get("open_ports", [])
+        parts.append("<h2>정찰: 열린 포트</h2>")
+        parts.append(f"<p class=\"meta\">대상: <code>{_esc(recon.get('target', ''))}</code> &middot; 방법: {_esc(recon.get('method', ''))} &middot; 열린 포트 {len(open_ports)}개</p>")
+        if open_ports:
+            parts.append("<table><tr><th>포트</th><th>서비스</th><th>배너</th></tr>")
+            for p in open_ports:
+                parts.append(
+                    f"<tr><td>{p.get('port')}/{_esc(p.get('protocol', 'tcp'))}</td>"
+                    f"<td>{_esc(p.get('service', ''))}</td><td>{_esc(p.get('banner', ''))}</td></tr>"
+                )
+            parts.append("</table>")
+
+    if bruteforce is not None:
+        hits = bruteforce.get("hits", [])
+        parts.append("<h2>초기 접근: SSH 브루트포싱</h2>")
+        parts.append(
+            f"<p class=\"meta\">대상: <code>{_esc(bruteforce.get('target', ''))}:{bruteforce.get('port', '')}</code> "
+            f"&middot; 시도 {bruteforce.get('attempts', 0)}회 &middot; {bruteforce.get('duration_s', 0)}s</p>"
+        )
+        if hits:
+            parts.append(f"<p><span class=\"badge fail\">취약</span> 자격정보 {len(hits)}개 발견</p>")
+            parts.append("<table><tr><th>사용자</th><th>비밀번호</th></tr>")
+            for h in hits:
+                parts.append(f"<tr><td>{_esc(h.get('user'))}</td><td>{_esc(h.get('password'))}</td></tr>")
+            parts.append("</table>")
+        else:
+            parts.append("<p><span class=\"badge pass\">양호</span> 시도한 목록에서 유효한 자격정보 없음</p>")
+
+    if web_recon is not None:
+        all_hits = web_recon.get("hits", [])
+        hits = [h for h in all_hits if not h.get("looks_like_catchall")]
+        catchall_count = len(all_hits) - len(hits)
+        parts.append("<h2>정찰: 웹 경로 스캔</h2>")
+        parts.append(
+            f"<p class=\"meta\">대상: <code>{_esc(web_recon.get('base_url', ''))}</code> "
+            f"&middot; 시도 {web_recon.get('attempts', 0)}회 &middot; {web_recon.get('duration_s', 0)}s</p>"
+        )
+        if web_recon.get("catchall_detected"):
+            parts.append(
+                "<p class=\"meta\">이 서버는 존재하지 않는 경로에도 응답함(catch-all 라우팅) — "
+                f"동일한 응답을 준 경로 {catchall_count}개는 오탐으로 판단해 아래 목록에서 제외함</p>"
+            )
+        if hits:
+            parts.append(f"<p><span class=\"badge fail\">주의</span> 응답 있는 경로 {len(hits)}개 발견</p>")
+            parts.append("<table><tr><th>상태코드</th><th>경로</th><th>크기</th><th>Content-Type</th></tr>")
+            for h in hits:
+                parts.append(
+                    f"<tr><td>{h.get('status')}</td><td>/{_esc(h.get('path'))}</td>"
+                    f"<td>{h.get('length')}</td><td>{_esc(h.get('content_type', ''))}</td></tr>"
+                )
+            parts.append("</table>")
+        else:
+            parts.append("<p><span class=\"badge pass\">양호</span> 시도한 목록에서 노출된 경로 없음</p>")
+
+    if vuln_scan is not None:
+        matches = vuln_scan.get("matches", [])
+        total_cves = sum(len(m.get("cves", [])) for m in matches)
+        parts.append("<h2>취약점: 버전 기반 CVE 매칭</h2>")
+        parts.append(
+            "<p class=\"meta\">배너에서 인식한 제품/버전을 NVD에 조회한 결과입니다. "
+            "CVE가 있다고 해서 실제로 뚫린다는 뜻은 아니며(배포판 백포트/설정에 따라 다름), "
+            "매칭 자체가 참고용 휴리스틱입니다.</p>"
+        )
+        if total_cves:
+            parts.append(f"<p><span class=\"badge fail\">주의</span> CVE {total_cves}건 발견</p>")
+        for m in matches:
+            if not m.get("product"):
+                parts.append(f"<p class=\"meta\">{m.get('port')}/tcp: {_esc(m.get('note', ''))}</p>")
+                continue
+            parts.append(f"<h3>{m.get('port')}/tcp — {_esc(m.get('product'))} {_esc(m.get('version'))}</h3>")
+            cves = m.get("cves", [])
+            if cves:
+                parts.append("<table><tr><th>CVE</th><th>심각도</th><th>점수</th><th>설명</th></tr>")
+                for c in cves:
+                    parts.append(
+                        f"<tr><td>{_esc(c.get('cve_id'))}</td><td>{_esc(c.get('severity', ''))}</td>"
+                        f"<td>{c.get('score', '')}</td><td>{_esc(c.get('description', ''))}</td></tr>"
+                    )
+                parts.append("</table>")
+            else:
+                parts.append("<p><span class=\"badge pass\">양호</span> 매칭된 CVE 없음</p>")
+
+    if kisa is not None:
+        items = kisa.get("results", [])
+        good = sum(1 for r in items if r.get("final_result") == "GOOD")
+        vuln = sum(1 for r in items if r.get("final_result") == "VULNERABLE")
+        manual = sum(1 for r in items if r.get("final_result") == "MANUAL")
+        parts.append("<h2>KISA CIIP 기술적 취약점 진단</h2>")
+        parts.append(
+            f"<p class=\"meta\">대상: <code>{_esc(kisa.get('target', ''))}</code> "
+            f"&middot; 플랫폼: {_esc(kisa.get('platform', ''))} &middot; 총 {len(items)}개 항목 "
+            f"(2026 KISA 주요정보통신기반시설 기술적 취약점 분석·평가 상세 가이드 기준)</p>"
+        )
+        parts.append("<div class=\"summary\">")
+        parts.append(f"<div class=\"stat\"><div class=\"value\">{good}</div><div class=\"label\">양호</div></div>")
+        parts.append(f"<div class=\"stat\"><div class=\"value\">{vuln}</div><div class=\"label\">취약</div></div>")
+        parts.append(f"<div class=\"stat\"><div class=\"value\">{manual}</div><div class=\"label\">수동진단</div></div>")
+        parts.append("</div>")
+        vuln_items = [r for r in items if r.get("final_result") == "VULNERABLE"]
+        if vuln_items:
+            parts.append("<h3>취약 항목</h3>")
+            for r in vuln_items:
+                guideline = r.get("guideline", {})
+                parts.append("<div class=\"step\">")
+                parts.append(
+                    f"<div class=\"step-title\">{_esc(r.get('item_id'))}: {_esc(r.get('item_name'))}"
+                    f"<span class=\"badge fail\">취약</span></div>"
+                )
+                parts.append(f"<div class=\"meta\">{_esc(r.get('summary', ''))}</div>")
+                if guideline.get("remediation"):
+                    parts.append(f"<p><strong>조치방법:</strong> {_esc(guideline['remediation'])}</p>")
+                parts.append("</div>")
+        manual_items = [r for r in items if r.get("final_result") == "MANUAL"]
+        if manual_items:
+            parts.append("<h3>수동진단 필요 항목</h3><ul>")
+            for r in manual_items:
+                parts.append(f"<li>{_esc(r.get('item_id'))}: {_esc(r.get('item_name'))} — {_esc(r.get('summary', ''))}</li>")
+            parts.append("</ul>")
+
     parts.append("<h2>실행 체인</h2>")
+    current_tactic = None
     for i, r in enumerate(results, start=1):
+        if step_tactics is not None:
+            tactic = step_tactics[i - 1]
+            if tactic != current_tactic:
+                parts.append(f"<h3>전술: {_esc(tactic)}</h3>")
+                current_tactic = tactic
         status = "성공" if r.success else "실패"
         badge_cls = "pass" if r.success else "fail"
         parts.append("<div class=\"step\">")

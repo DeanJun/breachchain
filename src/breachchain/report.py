@@ -61,6 +61,21 @@ def _esc(text: str) -> str:
     return html.escape(str(text))
 
 
+_MAX_OUTPUT_LINES = 15
+
+
+def _render_output(stdout: str, success: bool) -> str:
+    """Full output for failures (need it to diagnose). For successes, some ART
+    commands dump hundreds of lines (e.g. `ip tcp_metrics show`) that just
+    prove the command ran -- truncate those so the report stays readable.
+    """
+    lines = stdout.splitlines()
+    if success and len(lines) > _MAX_OUTPUT_LINES:
+        shown = "\n".join(lines[:_MAX_OUTPUT_LINES])
+        return f"<pre>{_esc(shown)}\n... ({len(lines) - _MAX_OUTPUT_LINES}줄 생략, 총 {len(lines)}줄)</pre>"
+    return f"<pre>{_esc(stdout)}</pre>"
+
+
 def render_report_html(
     results: list[ExecutionResult],
     state: ScenarioState,
@@ -72,6 +87,7 @@ def render_report_html(
     web_recon: dict | None = None,
     vuln_scan: dict | None = None,
     kisa: dict | None = None,
+    fingerprint: dict | None = None,
 ) -> str:
     total = len(results)
     succeeded = sum(1 for r in results if r.success)
@@ -120,6 +136,22 @@ def render_report_html(
             parts.append("</table>")
         else:
             parts.append("<p><span class=\"badge pass\">양호</span> 시도한 목록에서 유효한 자격정보 없음</p>")
+
+    if fingerprint is not None:
+        parts.append("<h2>대상 식별 (OS/펌웨어)</h2>")
+        if fingerprint.get("is_likely_embedded"):
+            parts.append("<p><span class=\"badge fail\">IoT/임베디드 추정</span></p>")
+        parts.append("<table>")
+        rows = [
+            ("OS", fingerprint.get("os_release") or "(확인 불가)"),
+            ("커널", fingerprint.get("kernel") or "(확인 불가)"),
+            ("아키텍처", fingerprint.get("cpu_arch") or "(확인 불가)"),
+            ("CPU", fingerprint.get("cpu_model") or "(확인 불가)"),
+            ("보드 모델", fingerprint.get("board_model") or "(해당 없음/확인 불가)"),
+        ]
+        for label, value in rows:
+            parts.append(f"<tr><th>{_esc(label)}</th><td>{_esc(value)}</td></tr>")
+        parts.append("</table>")
 
     if web_recon is not None:
         all_hits = web_recon.get("hits", [])
@@ -230,7 +262,7 @@ def render_report_html(
         parts.append(f"<div class=\"meta\">대상: <code>{_esc(r.target_name)}</code> &middot; 소요 시간: {r.duration_s}s</div>")
         parts.append(f"<span class=\"cmd\">{_esc(r.command.strip())}</span>")
         if r.stdout.strip():
-            parts.append(f"<pre>{_esc(r.stdout.strip())}</pre>")
+            parts.append(_render_output(r.stdout.strip(), r.success))
         if not r.success and r.stderr.strip():
             parts.append(f"<pre class=\"err\">{_esc(r.stderr.strip())}</pre>")
         parts.append("</div>")

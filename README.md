@@ -37,6 +37,7 @@ breachchain/
 │   ├── web_recon.py            # HTTP 경로/디렉토리 브루트포싱 (숨겨진 admin/backup/.git 등 탐색)
 │   ├── vuln_scan.py             # 배너 버전 → NVD CVE 매칭 (휴리스틱, 재현율 낮음 — 아래 5.6 참고)
 │   ├── bruteforce.py             # SSH 계정/비밀번호 무차별 대입 (초기 접근용)
+│   ├── device_fingerprint.py      # SSH 접속 후 OS/커널/CPU 아키텍처/보드 모델 식별, IoT/임베디드 여부 판정
 │   ├── kisa_runner.py             # KISA CIIP 2026 기술적 취약점 진단 스크립트를 원격 SSH 대상에 업로드+실행 (아래 5.7 참고)
 │   ├── report.py                   # HTML 리포트 렌더러 (한국어, 흰 배경 고정; 정찰/브루트포싱/CVE/KISA/전술별 섹션 포함)
 │   ├── cli.py                       # ART 후보 1개만 수동 실행하는 CLI (--dry-run, --check-only 지원)
@@ -268,6 +269,14 @@ NVD `keywordSearch`는 CVE **설명 텍스트에 대한 자유텍스트 검색**
 - [x] **버그 수정 3**: `web_recon.py` catch-all 오탐 문제(Day 7에서 발견만 하고 미수정 상태였음) 해결 — 존재하지 않는 무작위 경로로 기준 응답을 먼저 확보하고, 그 응답(status+length)과 동일한 결과는 `WebHit.looks_like_catchall=True`로 표시해 실제 발견 목록에서 제외. `report.py`도 같이 반영. ipTIME 공유기로 재검증(48개 중 47개가 정확히 걸러지고 진짜 응답 1개만 남음)
 - [x] **`--kisa-timeout` 수정 후 재검증**: 사용자 개인 서버 대상으로 `pipeline.py` 전체(정찰→CVE 매칭→KISA CIIP 진단→전술별 ART 실행→통합 리포트) 재실행. KISA 진단이 이번엔 타임아웃 없이 정상 완료됐고, ART 후보 20개 중 14개 성공(전술 순서: Discovery → ... → Collection → Command and Control)까지 끝까지 완주. 유일한 실패는 `T1005`(sqlite 덤프)가 60초 내에 응답 없어 타임아웃 — 개별 명령 타임아웃이지 파이프라인 버그 아님.
 
+### 완료 — Day 9 (IoT 시나리오 방향 확정 + 대상 식별 기능 추가)
+- [x] **IoT 시나리오 스코프 확정**: KT Enterprise IoT 서비스 구조(센서 → IoT모뎀/라우터 → KT 무선망(LTE/3G) → 인터넷 → 관제시스템) 참고. breachchain이 다룰 수 있는 건 IP 기반 업링크 구간(IoT모뎀/라우터 ↔ 관제시스템)뿐이라고 스코프를 명확히 함 — 센서↔모뎀 로컬 구간(Zigbee/BLE/RS-485 등 필드버스)과 베이스밴드/펨토셀 레벨은 각각 별도 하드웨어/전문 영역이라 의도적으로 범위 밖으로 뺌. 목표 시나리오: IoT모뎀/라우터를 1차 침투 지점으로 삼아 내부망 관제시스템까지 확산 가능성을 보여주는 2단계 구조.
+- [x] **`recon.py`에 IoT 흔한 포트 추가**: 텔넷(23), RTSP(554), MQTT(1883/8883), CoAP(5683), Modbus(502), Siemens S7comm(102), DNP3(20000), TR-069/CWMP(7547), Mikrotik Winbox(8291), Dahua류 DVR(37777) 등 `IOT_PORTS` 신규. `COMMON_PORTS`와 합쳐 `default_ports()`로 스캔.
+- [x] **`device_fingerprint.py` 신규**: SSH 접속 성공 직후 읽기 전용 명령(`uname -a`, `/etc/os-release`, `/proc/device-tree/model`, `/proc/cpuinfo`)으로 OS/커널/CPU 아키텍처/보드 모델을 수집. `/proc/device-tree/model`이 존재하거나 ARM 계열 아키텍처(armv6l/armv7l/aarch64)면 `is_likely_embedded=True`로 판정 — "이게 그냥 서버 VM이 아니라 실제 IoT/임베디드 보드"라는 걸 증명하는 근거. `pipeline.py`에서 접속 확인 직후, KISA 진단 이전 단계로 실행. 실서버(x86_64 Ubuntu) 대상 스모크 테스트로 `is_likely_embedded=False` 정확히 판정됨을 확인.
+- [x] **`report.py`: 긴 명령 출력 축소**: `ip tcp_metrics show` 같이 성공한 절차의 출력이 수백 줄을 찍어 리포트 가독성을 해치던 문제 수정. 성공한 절차는 15줄 초과 시 앞 15줄만 보여주고 "N줄 생략, 총 M줄"로 요약 (`_render_output()`). 실패한 절차는 디버깅 필요하므로 전체 출력 그대로 유지.
+- [x] **위 3건 반영 후 재검증**: 사용자 개인 서버 대상 `pipeline.py` 전체 재실행. 대상 식별 정상 동작(Ubuntu 22.04.3 LTS / x86_64로 정확히 판정), KISA 진단 정상 완료(양호 45/취약 18/총 67), ART 20개 중 14개 성공, 리포트에서 긴 출력 축소 반영 확인.
+- [ ] **다음**: IoT처럼 보이는 VM 구성(ARM 아키텍처 또는 `/proc/device-tree/model` 흉내) + 2번째 VM을 "관제시스템" 역할로 세팅해 IoT모뎀→내부망 확산 시나리오 실제 재현. KISA CIIP 체크리스트가 임베디드 펌웨어(BusyBox 등)에서 얼마나 유효한지도 이 VM으로 실측 예정 (다수 항목이 `useradd`/`cron`/`systemctl` 등 표준 리눅스 도구 의존이라 MANUAL/오류로 빠질 가능성 있음 — 검증 필요).
+
 ---
 
 ## 6.5 전술(Tactic) 기반 기법 순환 — 2026-08-13 완료
@@ -319,8 +328,5 @@ NVD `keywordSearch`는 CVE **설명 텍스트에 대한 자유텍스트 검색**
 - `64aaa6b` Day 3: HTML report, console+file logging, Windows run robustness
 - `dc06267` Day 3.5: real ART data pipeline (art_loader.py, fetch_atomics.sh) + full README
 - `4801976` README: tactic-based technique rotation not implemented yet
-- (다음 커밋: Day 4 — 하드코딩 데모(definitions/, loader.py, scenario.py) 삭제, ART 후보를 cli.py/art_runner.py로 실제 실행 경로에 연결, 접속 사전 체크(check_connection) 추가
-  Day 5 — mitreattack-python으로 technique_id → tactic 매핑(tactic_mapping.py) 구현
-  Day 6 — paramiko 기반 비밀번호 SSH 인증, recon.py(포트 스캔)/bruteforce.py(SSH 브루트포싱) 신규, art_runner --by-tactic, pipeline.py(통합 진입점) 추가
-  Day 7 — web_recon.py/vuln_scan.py 신규, recon.py HTTP 배너 그래빙, KISA CIIP 2026 통합(kisa_runner.py), 실제 VM end-to-end 검증 완료, subprocess 무한대기 버그 수정
-  Day 8 — 실서비스 운영 서버 실전 테스트(약한 root 비밀번호 실제 발견), KISA 타임아웃 하드코딩 수정, 빈 예외 메시지 로깅 수정, web_recon.py catch-all 오탐 수정)
+- `829943e` Day 4-8: real ART pipeline, recon/bruteforce/web_recon/vuln_scan, KISA CIIP integration
+- (다음 커밋: Day 9 — IoT 시나리오 스코프 확정(KT Enterprise IoT 구조 참고), recon.py IoT 포트 추가, device_fingerprint.py 신규(OS/커널/보드모델 식별, IoT/임베디드 판정), report.py 긴 출력 축소, 실서버 재검증)

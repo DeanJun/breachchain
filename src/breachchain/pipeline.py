@@ -30,6 +30,7 @@ if __package__ in (None, ""):
     from breachchain.tactic_mapping import load_mapping
     from breachchain.vuln_scan import scan_recon as vuln_scan_recon
     from breachchain.kisa_runner import run_kisa_unix
+    from breachchain.device_fingerprint import fingerprint as fingerprint_device
 else:
     from .art_loader import load_candidates
     from .art_runner import TACTIC_ORDER, run_batch_by_tactic, select_candidates
@@ -41,6 +42,7 @@ else:
     from .tactic_mapping import load_mapping
     from .vuln_scan import scan_recon as vuln_scan_recon
     from .kisa_runner import run_kisa_unix
+    from .device_fingerprint import fingerprint as fingerprint_device
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS_DIR = REPO_ROOT / "runs"
@@ -158,6 +160,15 @@ def main() -> int:
     if not check.ok:
         return 1
 
+    # 2.5 Device fingerprint: what is this actually -- a Raspberry Pi running
+    # Raspbian, or a generic Ubuntu VM? IoT/embedded targets show a board
+    # model (/proc/device-tree/model) and an ARM arch; servers don't.
+    fp = fingerprint_device(target)
+    logger.info(f"[식별] {fp.os_release or '(OS 확인 불가)'} / {fp.cpu_arch}"
+                + (f" / 보드: {fp.board_model}" if fp.board_model else "")
+                + (" -- IoT/임베디드 장비로 추정" if fp.is_likely_embedded else ""))
+    fingerprint_dict = fp.to_dict()
+
     # 3. KISA CIIP configuration audit -- a different question than ART
     # ("is this technique reproducible") or vuln_scan ("does this banner
     # version have known CVEs"): "does this config comply with KISA's
@@ -197,6 +208,7 @@ def main() -> int:
     report_html = render_report_html(
         results, state, coverage, scenario_name=f"breachchain 진단 리포트: {args.host}",
         step_tactics=step_tactics, recon=recon_dict, bruteforce=bruteforce_dict, vuln_scan=vuln_scan_dict, kisa=kisa_dict,
+        fingerprint=fingerprint_dict,
     )
     report_path = REPORTS_DIR / report_filename(ts)
     save_report(report_html, report_path)

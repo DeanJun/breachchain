@@ -25,6 +25,35 @@ COMMON_PORTS = [
     9090, 9200, 9300, 11211, 15672, 27017,
 ]
 
+# IoT/임베디드 장비에서 흔히 열려 있는 포트 -- 서버용 COMMON_PORTS엔 없던 것들
+# (텔넷 관리 콘솔, 카메라 RTSP 스트림, MQTT 브로커, 산업제어 프로토콜, 라우터
+# 관리 포트, TR-069 원격관리 등). 기본 스캔에 포함시켜 IoT 대상을 더 잘 잡는다.
+IOT_PORTS = [
+    23,      # 텔넷 -- 라우터/카메라/DVR 관리 콘솔에 여전히 흔함 (COMMON_PORTS와 겹침)
+    554,     # RTSP -- IP 카메라 비디오 스트림
+    1883,    # MQTT
+    8883,    # MQTT over TLS
+    5683,    # CoAP (UDP가 원칙이지만 TCP 바리안트도 존재)
+    502,     # Modbus (산업제어)
+    102,     # Siemens S7comm (산업제어 PLC)
+    20000,   # DNP3 (산업제어)
+    7547,    # TR-069/CWMP -- ISP가 라우터 원격관리에 쓰는 포트, 실제 봇넷 표적이 됐던 이력 있음
+    8291,    # Mikrotik Winbox
+    37777,   # 다후아(Dahua)류 DVR/NVR 관리 포트
+    9999,    # 일부 공유기/IoT 웹 관리 포트
+]
+
+
+def default_ports() -> list[int]:
+    """COMMON_PORTS + IOT_PORTS 합집합, 순서 보존."""
+    seen = set()
+    merged = []
+    for p in COMMON_PORTS + IOT_PORTS:
+        if p not in seen:
+            seen.add(p)
+            merged.append(p)
+    return merged
+
 # Web servers don't send anything until spoken to, unlike SSH/FTP/SMTP which
 # banner first -- a raw socket recv() on these just times out with nothing.
 # Need an actual HTTP HEAD to read the Server header (e.g. "nginx/1.18.0").
@@ -137,7 +166,7 @@ def _scan_nmap(host: str, ports: list[int], timeout: float) -> list[OpenPort] | 
 
 
 def scan(host: str, ports: list[int] | None = None, timeout: float = 1.5, max_workers: int = 100) -> ReconResult:
-    ports = ports or COMMON_PORTS
+    ports = ports or default_ports()
     nmap_result = _scan_nmap(host, ports, timeout)
     if nmap_result is not None:
         return ReconResult(target=host, method="nmap", open_ports=nmap_result)

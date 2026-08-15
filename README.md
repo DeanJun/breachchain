@@ -30,7 +30,8 @@ breachchain/
 ├── src/breachchain/
 │   ├── art_loader.py      # 실제 ART YAML 스키마 파서 + 안전 필터 + candidates json 로더/조회
 │   ├── executor.py        # local/SSH 실행기 (AtomicTest 대상), paramiko 기반 (키+비밀번호 인증), 접속 사전 체크
-│   ├── state.py            # 상태 누적 (assets/credentials/access, 단순 JSON 구조)
+│   ├── state.py            # 상태 누적 (assets/credentials/access) + eligible/meets/apply_provides (2026-08-15 실동작 추가)
+│   ├── state_rules.py       # 후보별 requires/provides 수동 태깅 (art_loader의 AtomicTest엔 이 필드가 없어서 별도 관리) + stdout에서 자격정보 추출
 │   ├── mapping.py          # 실행 로그 → ATT&CK 커버리지 레이어
 │   ├── tactic_mapping.py     # technique_id → tactic 매핑 (mitreattack-python, STIX 데이터셋)
 │   ├── recon.py               # IP만으로 하는 정찰: 포트 스캔 (nmap 있으면 사용, 없으면 순수 파이썬 소켓 스캔), HTTP Server 헤더 배너
@@ -41,7 +42,7 @@ breachchain/
 │   ├── kisa_runner.py             # KISA CIIP 2026 기술적 취약점 진단 스크립트를 원격 SSH 대상에 업로드+실행 (아래 5.7 참고)
 │   ├── report.py                   # HTML 리포트 렌더러 (한국어, 흰 배경 고정; 정찰/브루트포싱/CVE/KISA/전술별 섹션 포함)
 │   ├── cli.py                       # ART 후보 1개만 수동 실행하는 CLI (--dry-run, --check-only 지원)
-│   ├── art_runner.py                 # ART 후보 여러 개를 배치 실행 (+ --by-tactic로 전술 순서 실행) + state/coverage/report 산출
+│   ├── art_runner.py                 # ART 후보 배치 실행: run_batch / run_batch_by_tactic(--by-tactic) / run_state_driven(--state-driven, state_rules.py 게이팅)
 │   └── pipeline.py                    # 메인 진입점: IP만 주면 정찰→CVE매칭→(브루트포싱)→KISA 진단→전술별 ART 실행→통합 리포트
 ├── vendor/                # gitignore 대상.
 │   ├── atomic-red-team/   # fetch_atomics.sh로 받는 실제 ART 데이터 (350MB+)
@@ -275,7 +276,11 @@ NVD `keywordSearch`는 CVE **설명 텍스트에 대한 자유텍스트 검색**
 - [x] **`device_fingerprint.py` 신규**: SSH 접속 성공 직후 읽기 전용 명령(`uname -a`, `/etc/os-release`, `/proc/device-tree/model`, `/proc/cpuinfo`)으로 OS/커널/CPU 아키텍처/보드 모델을 수집. `/proc/device-tree/model`이 존재하거나 ARM 계열 아키텍처(armv6l/armv7l/aarch64)면 `is_likely_embedded=True`로 판정 — "이게 그냥 서버 VM이 아니라 실제 IoT/임베디드 보드"라는 걸 증명하는 근거. `pipeline.py`에서 접속 확인 직후, KISA 진단 이전 단계로 실행. 실서버(x86_64 Ubuntu) 대상 스모크 테스트로 `is_likely_embedded=False` 정확히 판정됨을 확인.
 - [x] **`report.py`: 긴 명령 출력 축소**: `ip tcp_metrics show` 같이 성공한 절차의 출력이 수백 줄을 찍어 리포트 가독성을 해치던 문제 수정. 성공한 절차는 15줄 초과 시 앞 15줄만 보여주고 "N줄 생략, 총 M줄"로 요약 (`_render_output()`). 실패한 절차는 디버깅 필요하므로 전체 출력 그대로 유지.
 - [x] **위 3건 반영 후 재검증**: 사용자 개인 서버 대상 `pipeline.py` 전체 재실행. 대상 식별 정상 동작(Ubuntu 22.04.3 LTS / x86_64로 정확히 판정), KISA 진단 정상 완료(양호 45/취약 18/총 67), ART 20개 중 14개 성공, 리포트에서 긴 출력 축소 반영 확인.
-- [ ] **다음**: IoT처럼 보이는 VM 구성(ARM 아키텍처 또는 `/proc/device-tree/model` 흉내) + 2번째 VM을 "관제시스템" 역할로 세팅해 IoT모뎀→내부망 확산 시나리오 실제 재현. KISA CIIP 체크리스트가 임베디드 펌웨어(BusyBox 등)에서 얼마나 유효한지도 이 VM으로 실측 예정 (다수 항목이 `useradd`/`cron`/`systemctl` 등 표준 리눅스 도구 의존이라 MANUAL/오류로 빠질 가능성 있음 — 검증 필요).
+- [x] **IoT 대리 VM 구축**: OpenWrt 25.12.5(x86_64, ext4-combined 이미지)를 VMware에 vmdk로 변환해 부팅, LAN 인터페이스를 DHCP로 전환해 NAT 대역 IP 확보. 실제 IoT/라우터 OS(BusyBox 기반) 대상으로 `pipeline.py` 최초 실행.
+- [x] **실측 발견 (`reports.md` 2026-08-15 항목 참고)**: ART 후보 상당수가 `ash: xxx: not found`로 실패 — OpenWrt는 `bash`가 아니라 BusyBox `ash`고 `truncate`/`arp`/`systemctl`/`gcc` 등 GNU coreutils가 없음. ART의 `supported_platforms: [linux]`는 실제로는 "GNU/Linux(coreutils+bash 있음)"를 암묵 전제하고 있어서, `art_loader.py`의 안전 필터가 이 차이를 구분 못 한다는 걸 실측으로 확인. 성공한 절차(`T1027` base64, `T1016` 네트워크 설정, `T1007` init.d 서비스 목록)는 정상적으로 유효한 정찰 정보를 남김.
+- [x] **서브넷 스윕 절차가 사실상 무한정 오래 걸리는 문제 확인**: `T1018 Remote System Discovery - sweep`이 기본값(`192.168.1.0/24`, 254개 순차 ping)으로 실행되는데, 실제 대상 서브넷과도 안 맞고 시간도 오래 걸림. `art_runner.py`/`pipeline.py`가 `cli.py`와 달리 `--var` 오버라이드를 지원 안 해서 배치 실행 중엔 못 고치는 구조적 한계 확인 (아직 미해결, 7번 참고).
+- [x] **상태 기반 분기(`state_rules.py`) 구현**: `requires`/`provides` 수동 태깅 + `state.py`의 `eligible()`/`meets()`/`apply_provides()` + `art_runner.run_state_driven()`(조건 미충족 후보 SKIP, 성공 시 state 갱신, tactic 전체 SKIP 시 dead-end 기록) + `pipeline.py` 전환(브루트포싱 자격정보도 `initial_state`로 시드). fixture로 자격정보 추출 정확히 검증됨. 자세한 내용/한계는 6.5절, `reports.md` 참고.
+- [x] **`grep -ri password /`가 실제 대상에서 멈추는 버그 발견 및 수정**: state-driven을 OpenWrt 실기에 돌리다 `T1552.001`에서 응답 없음. `/etc`는 0.07초, `/proc`은 20초 타임아웃까지 응답 없음으로 원인 재현·확인(`/proc`의 pseudo-file을 grep이 읽다 멈춤 — GNU/Linux 전반에 흔한 함정). `art_loader.py`에 `_UNSAFE_WIDE_DEFAULTS` 테이블 추가해 `file_path`/`search_path` 기본값이 `/`인 12개 후보를 `$HOME /etc`로 축소, 후보 JSON 재생성 후 같은 후보가 0.1초에 정상 완료되는 것까지 재검증 (`reports.md` 참고).
 
 ---
 
@@ -285,13 +290,19 @@ NVD `keywordSearch`는 CVE **설명 텍스트에 대한 자유텍스트 검색**
 
 `pipeline.py` 또는 `art_runner.py --by-tactic`을 쓰면 233개(또는 필터링된) 후보를 tactic별로 묶어서(`group_by_tactic()`), ATT&CK 공식 순서(`TACTIC_ORDER`: Reconnaissance → Resource Development → Initial Access → Execution → Persistence → Privilege Escalation → Defense Impairment → Stealth → Credential Access → Discovery → Lateral Movement → Collection → Command and Control → Exfiltration → Impact)대로 실행한다. 리포트에도 전술 구간이 나뉘어 표시된다.
 
-**단, 아직 "순환"은 아니고 "전술 순서대로 쭉 실행"이다.** 진짜 "상태 기반 순환"(어떤 전술 단계에서 성공하면 다음 전술로 넘어가고, 실패하면 같은 단계에서 다른 후보를 시도하는)이 되려면 **상태 기반 분기 로직**(아래 7-1번)이 필요하다 — 지금은 각 전술 그룹 안의 후보를 성공/실패 관계없이 전부 실행하고 결과만 기록한다.
+**2026-08-15 갱신**: 이제 "순환"도 된다. `art_runner.py --state-driven` 또는 `pipeline.py`(기본으로 상태 기반 사용)가 `state_rules.py`의 `requires`/`provides` 태그를 `ScenarioState`와 대조해서, 조건 미충족 후보는 실행 자체를 건너뛰고(`SKIP`, 리포트에 사유와 함께 표시), 조건 충족 후보만 실행한다. 성공한 절차의 `provides`(예: `credential`)는 stdout에서 실제로 추출해 `state.credentials`에 반영된다 — 브루트포싱으로 찾은 초기 자격정보도 이제 `ScenarioState`에 기록된다(전엔 지역변수로만 존재하고 `state.json`엔 안 남았음). 한 전술 그룹의 후보가 전부 조건 미충족으로 건너뛰어지면 "dead end"로 리포트에 표시된다.
+
+**정직한 스코프 한계**: 안전 필터를 통과한 233개 후보는 전부 "이미 접속된 대상 안에서" 실행하는 단일 호스트용 절차라, 실제로 `requires`가 걸리는 경우가 지금은 거의 없다(T1078/T1021 같은 "찾은 자격정보로 다른 호스트에 접속" 류는 권한 상승/2차 대상이 필요해서 안전 필터에서 빠짐). 그래서 지금 `state_rules.py`는 메커니즘(게이팅+state 채우기)은 실제로 검증됐지만, "극적인 분기"를 보여주는 사례는 적다 — 진짜 분기가 빛을 보려면 **다중 호스트 오케스트레이션**(찾은 자격정보로 새 대상에 연결)이 필요하고, 이건 아직 없다(아래 7번 다음 우선순위).
 
 ---
 
 ## 7. 남은 작업 (우선순위 순)
 
-1. **상태 기반 분기 로직 (핵심 차별점, 시간 되면)** — tactic별 순차 실행(Day 6)까지는 됐지만, "이 tactic에서 성공하면 다음으로, 실패하면 이 tactic 안에서 다른 후보로"라는 진짜 분기는 없음. ART 후보(`AtomicTest`)에는 `requires`/`provides` 필드가 없으므로, 후보 JSON에 수동/휴리스틱으로 태깅하거나 별도 매핑 테이블이 필요. `state.py`의 assets/credentials/access와 대조해 "지금 실행 가능한 후보"를 계산하는 `eligible_procedures()` 함수가 필요. 마감(일요일) 안에 여유 있으면 시도, 없으면 "다음 확장 포인트"로 정직하게 문서화.
+1. **다중 호스트 확산(진짜 lateral movement)** — 상태 기반 분기 메커니즘 자체는 붙었지만(6.5절), 지금 파이프라인은 대상 호스트 하나에 대해서만 동작한다. `state.credentials`에 찾은 자격정보가 쌓여도, 그걸로 **다른 호스트**에 자동으로 연결을 시도하는 로직은 없다. 이게 원래 기획서(섹션 5)의 "접근 범위 확대" 서사를 완성하는 마지막 조각.
+
+1.5. **배치 실행에 `--var` 오버라이드 추가** — `cli.py`는 되는데 `art_runner.py`/`pipeline.py`는 안 됨. 오늘 발견한 서브넷 스윕(`T1018` sweep, 기본값 `192.168.1.0/24`) 같은 후보가 대상 환경에 안 맞는 기본값으로 그대로 실행되는 문제의 근본 원인.
+
+1.6. **환경 인지형 후보 필터** — OpenWrt(BusyBox) 실측으로 확인됨: `art_loader.py`의 `linux` 태그는 실제로 "GNU/Linux(coreutils+bash)"를 전제하고 있어서, 임베디드/BusyBox 대상엔 상당수가 안 맞는다. `device_fingerprint.py`가 이미 수집하는 정보로 "이 대상이 GNU/Linux인지 BusyBox인지" 판단해서 후보 풀 자체를 거르는 필터가 필요.
 
 2. **`vuln_scan.py` 재현율 개선** — NVD keywordSearch 대신 CPE 기반 검색(`cpeName`)으로 바꿔야 실제 버전 범위 매칭이 됨 (5.6절 참고). vendor:product CPE 이름 매핑 테이블 필요.
 
@@ -306,7 +317,7 @@ NVD `keywordSearch`는 CVE **설명 텍스트에 대한 자유텍스트 검색**
 ## 8. 솔직한 현재 수준 평가
 
 "동작하는 프로토타입이자 개념 증명"이고, Day 8 기준으로 **실제 VM뿐 아니라 실서비스 운영 서버에서도 end-to-end 검증**을 마쳤지만 여전히 "실무 도구"는 아님. 이유:
-- 상태 관리가 사실상 장식(7-1 미구현) — `state.py`는 실행 이력만 기록할 뿐 assets/credentials/access를 자동으로 채워주는 로직이 없음, 다음 행동을 스스로 결정하지 못함. tactic 순서대로 실행은 하지만 "이 tactic에서 성공했으니 다음 단계로"라는 진짜 판단은 없고 그냥 순서대로 다 실행함
+- **2026-08-15 갱신**: 상태 기반 게이팅(`--state-driven`)이 실제로 붙어서 이전만큼 장식은 아님 — `state.py`가 이제 `provides`(credential 등)를 stdout에서 실제로 추출해 채우고, `requires` 미충족 후보는 진짜로 건너뜀. 다만 단일 호스트 범위 안에서만 동작하고(7-1 다중 호스트 확산 미구현), 안전 필터를 통과한 233개 후보 자체에 `requires`가 걸리는 경우가 드물어서 "판단"의 체감 효과는 아직 제한적임 — 메커니즘은 검증됐지만 진짜 극적인 분기는 다중 호스트가 붙어야 나옴
 - 에러 처리/재시도 정책 없음
 - `#{var}` 치환이 셸 커맨드에 그대로 삽입됨 — 여러 사람이 쓰는 도구라면 인젝션 검토 필요
 - 브루트포싱은 SSH 비밀번호 인증만, 기본 계정/비밀번호 목록도 아주 짧음(레인보우테이블/사전 공격 수준 아님) — "약한 기본 계정 찾기" 데모 수준

@@ -97,23 +97,53 @@ class AtomicTest:
         return _VAR_PATTERN.sub(_sub, self.cleanup_command)
 
 
+# Some ART tests default a search-scope argument to "/" (whole filesystem).
+# Recursing a real, live target's "/" walks into /proc and /sys, which contain
+# pseudo-files that can block a plain grep/find indefinitely (confirmed against
+# an OpenWrt target: `grep -ri password /proc` never returned inside a 20s
+# window -- see reports.md 2026-08-15). These are the only two directories
+# worth scanning for stashed credentials anyway (home dirs + config files),
+# so cap the default there rather than leaving "/" as a live-fire footgun.
+# Keyed by (technique_id, guid, argument_name) -> replacement default.
+_UNSAFE_WIDE_DEFAULTS = {
+    ("T1552.001", "37807632-d3da-442e-8c2e-00f44928ff8f", "file_path"): "$HOME /etc",
+    ("T1552.001", "bd4cf0d1-7646-474e-8610-78ccf5a097c4", "file_path"): "$HOME /etc",
+    ("T1552.001", "a8f6148d-478a-4f43-bc62-5efee9f931a4", "file_path"): "$HOME /etc",
+    ("T1552.001", "aa12eb29-2dbb-414e-8b20-33d34af93543", "file_path"): "$HOME /etc",
+    ("T1552.001", "9d9c22c9-fa97-4008-a204-478cf68c40af", "file_path"): "$HOME /etc",
+    ("T1552.004", "46959285-906d-40fa-9437-5a439accd878", "search_path"): "$HOME /etc",
+    ("T1552.004", "7c247dc7-5128-4643-907b-73a76d9135c3", "search_path"): "$HOME /etc",
+    ("T1552.004", "12e4a260-a7fd-4ed8-bf18-1a28c1395775", "search_path"): "$HOME /etc",
+    ("T1552.004", "864bb0b2-6bb5-489a-b43b-a77b3a16d68a", "search_path"): "$HOME /etc",
+    ("T1552.004", "922b1080-0b95-42b0-9585-b9a5ea0af044", "search_path"): "$HOME /etc",
+    ("T1552.004", "2a5a0601-f5fb-4e2e-aa09-73282ae6afca", "search_path"): "$HOME /etc",
+    ("T1552.004", "b05ac39b-515f-48e9-88e9-2f141b5bcad0", "search_path"): "$HOME /etc",
+}
+
+
 def _parse_test(technique_id: str, technique_display_name: str, path: Path, raw_test: dict) -> AtomicTest | None:
     executor = raw_test.get("executor") or {}
     command = executor.get("command")
     if not command:
         return None  # manual-only tests with no automatable command
+    guid = raw_test.get("auto_generated_guid", "")
+    input_arguments = raw_test.get("input_arguments") or {}
+    for arg_name, spec in input_arguments.items():
+        override = _UNSAFE_WIDE_DEFAULTS.get((technique_id, guid, arg_name))
+        if override is not None:
+            spec["default"] = override
     return AtomicTest(
         technique_id=technique_id,
         technique_display_name=technique_display_name,
         test_name=raw_test.get("name", "unnamed"),
-        guid=raw_test.get("auto_generated_guid", ""),
+        guid=guid,
         description=(raw_test.get("description") or "").strip(),
         platforms=raw_test.get("supported_platforms", []),
         executor_name=executor.get("name", ""),
         command=command,
         cleanup_command=executor.get("cleanup_command"),
         elevation_required=bool(executor.get("elevation_required", False)),
-        input_arguments=raw_test.get("input_arguments") or {},
+        input_arguments=input_arguments,
         source_path=path,
     )
 
@@ -139,9 +169,24 @@ def load_all_tests(atomics_dir: Path) -> list[AtomicTest]:
     return tests
 
 
+# Candidates whose default arguments make them impractical to run against a
+# real target regardless of the destructive-command/timeout heuristics --
+# unlike _UNSAFE_WIDE_DEFAULTS (a fixable scan-scope default), these can't be
+# fixed with a saner constant default because the right value depends on the
+# target's actual network (we don't know it at candidate-generation time).
+# Confirmed against a real OpenWrt target (reports.md 2026-08-15): this sweep
+# defaults to subnet 192.168.1.0/24 regardless of the target's real subnet,
+# sequentially pinging 254 hosts one at a time -- ran past a 2-minute timeout
+# without finishing, on the wrong network the whole time.
+_IMPRACTICAL_DEFAULT_GUIDS = {
+    "96db2632-8417-4dbb-b8bb-a8b92ba391de",  # T1018 Remote System Discovery - sweep
+}
+
+
 def filter_safe_linux(tests: list[AtomicTest]) -> list[AtomicTest]:
     """Keep only tests that are: linux-capable, sh/bash executed, no elevation
-    required, and don't match the destructive-command heuristic.
+    required, don't match the destructive-command heuristic, and aren't
+    known-impractical with their default arguments (_IMPRACTICAL_DEFAULT_GUIDS).
     """
     safe = []
     for t in tests:
@@ -152,6 +197,8 @@ def filter_safe_linux(tests: list[AtomicTest]) -> list[AtomicTest]:
         if t.elevation_required:
             continue
         if t.is_destructive():
+            continue
+        if t.guid in _IMPRACTICAL_DEFAULT_GUIDS:
             continue
         safe.append(t)
     return safe

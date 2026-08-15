@@ -52,6 +52,38 @@ class ScenarioState:
     def record_step(self, technique_id: str) -> None:
         self.history.append(technique_id)
 
+    def meets(self, requirement: str, target_name: str) -> bool:
+        """Check one requires-predicate (see state_rules.py's vocabulary)
+        against the current state. Unknown predicate strings fail closed
+        (treated as unmet) rather than silently passing.
+        """
+        if requirement == "credential":
+            return len(self.credentials) > 0
+        if requirement.startswith("access:"):
+            level = requirement.split(":", 1)[1]
+            return any(a.asset == target_name and a.level == level for a in self.access)
+        return False
+
+    def eligible(self, requires: list[str], target_name: str) -> bool:
+        return all(self.meets(r, target_name) for r in requires)
+
+    def apply_provides(self, provides: list[str], stdout: str, target_name: str, technique_id: str) -> None:
+        """Apply a candidate's provides-effects after a successful run.
+        Currently only "credential" is implemented (extracts from stdout via
+        state_rules.extract_credentials); unknown effect strings are ignored.
+        """
+        if "credential" in provides:
+            if __package__ in (None, ""):
+                from breachchain.state_rules import extract_credentials
+            else:
+                from .state_rules import extract_credentials
+            for identity in extract_credentials(stdout):
+                self.add_credential(identity, source_asset=target_name, discovered_via=technique_id)
+        for effect in provides:
+            if effect.startswith("access:"):
+                level = effect.split(":", 1)[1]
+                self.add_access(target_name, level, technique_id)
+
     def to_dict(self) -> dict:
         return {
             "assets": [asdict(a) for a in self.assets],

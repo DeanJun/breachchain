@@ -8,8 +8,11 @@ assumed SSH access was already granted (art_runner.py alone). This ties
 recon.py and bruteforce.py in front of it so a run can genuinely start from
 just an IP, matching what a real initial-access phase looks like.
 
-Still no state-based branching (README 7-1): within each tactic, every
-selected candidate runs regardless of prior results.
+State-driven (README 7-1): ART execution now goes through
+art_runner.run_state_driven, which gates each candidate on state_rules.py's
+requires/provides tags and records any brute-forced credential into
+ScenarioState before ART execution starts, instead of leaving it in a local
+variable that never reached state.json.
 """
 from __future__ import annotations
 
@@ -21,24 +24,26 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from breachchain.art_loader import load_candidates
-    from breachchain.art_runner import TACTIC_ORDER, run_batch_by_tactic, select_candidates
+    from breachchain.art_runner import run_state_driven, select_candidates
     from breachchain.bruteforce import DEFAULT_PASSWORDS, DEFAULT_USERS, brute_force_ssh
     from breachchain.executor import Target, check_connection
     from breachchain.mapping import build_coverage, save_coverage
     from breachchain.recon import scan
     from breachchain.report import render_report_html, report_filename, run_timestamp, save_report
+    from breachchain.state import ScenarioState
     from breachchain.tactic_mapping import load_mapping
     from breachchain.vuln_scan import scan_recon as vuln_scan_recon
     from breachchain.kisa_runner import run_kisa_unix
     from breachchain.device_fingerprint import fingerprint as fingerprint_device
 else:
     from .art_loader import load_candidates
-    from .art_runner import TACTIC_ORDER, run_batch_by_tactic, select_candidates
+    from .art_runner import run_state_driven, select_candidates
     from .bruteforce import DEFAULT_PASSWORDS, DEFAULT_USERS, brute_force_ssh
     from .executor import Target, check_connection
     from .mapping import build_coverage, save_coverage
     from .recon import scan
     from .report import render_report_html, report_filename, run_timestamp, save_report
+    from .state import ScenarioState
     from .tactic_mapping import load_mapping
     from .vuln_scan import scan_recon as vuln_scan_recon
     from .kisa_runner import run_kisa_unix
@@ -128,8 +133,14 @@ def main() -> int:
         total_cves = sum(len(m.cves) for m in matches)
         logger.info(f"[취약점] CVE {total_cves}건 발견")
 
-    # 2. Credentials: use what's given, else brute-force SSH.
+    # 2. Credentials: use what's given, else brute-force SSH. Seed a
+    # ScenarioState now so a credential obtained here is actually recorded
+    # (previously it only lived in the user/password local variables and
+    # never reached state.json even though it's how access was gained).
+    initial_state = ScenarioState()
     user, password, key = args.user, args.password, args.key
+    if user and (password or key):
+        initial_state.add_credential(user, source_asset=args.host, discovered_via="operator-provided")
     bruteforce_dict = None
     if not (user and (password or key)) and not args.skip_bruteforce:
         logger.info(f"[초기 접근] 자격정보 없음 -> {args.host}:{ssh_port} SSH 브루트포싱 시작")
@@ -139,6 +150,7 @@ def main() -> int:
         if bf.hits:
             user, password = bf.hits[0].user, bf.hits[0].password
             logger.info(f"[초기 접근] 확보한 자격정보 사용: {user}")
+            initial_state.add_credential(user, source_asset=args.host, discovered_via="bruteforce.py")
         else:
             logger.info("[초기 접근] 자격정보 확보 실패 -> ART 절차 실행은 건너뜀")
 
@@ -146,7 +158,7 @@ def main() -> int:
         coverage = build_coverage([])
         save_coverage(coverage, RUNS_DIR / "coverage.json")
         report_html = render_report_html(
-            [], _empty_state(), coverage, scenario_name=f"breachchain 진단 리포트: {args.host}",
+            [], ScenarioState(), coverage, scenario_name=f"breachchain 진단 리포트: {args.host}",
             recon=recon_dict, bruteforce=bruteforce_dict, vuln_scan=vuln_scan_dict,
         )
         report_path = REPORTS_DIR / report_filename(ts)
@@ -196,9 +208,10 @@ def main() -> int:
     selected = select_candidates(candidates, args.technique, limit)
     tactic_map = load_mapping()
 
-    logger.info(f"[진단] {len(selected)}개 후보를 전술 순서대로 실행")
-    results, state, step_tactics = run_batch_by_tactic(
-        selected, target, tactic_map, run_cleanup=not args.no_cleanup, timeout=args.timeout
+    logger.info(f"[진단] {len(selected)}개 후보를 전술 순서대로 실행 (상태 기반: state_rules.py의 requires 충족 여부로 후보를 거름)")
+    results, state, step_tactics, skipped, dead_end_tactics = run_state_driven(
+        selected, target, tactic_map, run_cleanup=not args.no_cleanup, timeout=args.timeout,
+        initial_state=initial_state,
     )
     state.save(RUNS_DIR / "state.json")
 
@@ -208,7 +221,7 @@ def main() -> int:
     report_html = render_report_html(
         results, state, coverage, scenario_name=f"breachchain 진단 리포트: {args.host}",
         step_tactics=step_tactics, recon=recon_dict, bruteforce=bruteforce_dict, vuln_scan=vuln_scan_dict, kisa=kisa_dict,
-        fingerprint=fingerprint_dict,
+        fingerprint=fingerprint_dict, skipped=skipped, dead_end_tactics=dead_end_tactics,
     )
     report_path = REPORTS_DIR / report_filename(ts)
     save_report(report_html, report_path)
@@ -217,14 +230,6 @@ def main() -> int:
     logger.info(f"완료: {succeeded}/{len(results)} 절차 성공")
     logger.info(f"리포트: {report_path}")
     return 0
-
-
-def _empty_state():
-    if __package__ in (None, ""):
-        from breachchain.state import ScenarioState
-    else:
-        from .state import ScenarioState
-    return ScenarioState()
 
 
 if __name__ == "__main__":

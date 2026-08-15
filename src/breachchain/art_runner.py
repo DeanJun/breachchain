@@ -5,17 +5,26 @@ log, state.json, coverage.json, and an HTML report.
 
 This replaces the old scenario.py demo, which chained 5 hand-written
 definitions/ procedures in a fixed order purely to exercise the pipeline.
-There is no state-based branching yet (see README section 7-1) -- every
-selected candidate runs regardless of prior results, and ScenarioState here
-only records execution history, since generic ART tests (unlike the
-hand-written demo procedures) don't carry the requires/provides semantics
-needed to auto-populate assets/credentials/access.
+
+Two orchestration modes:
+- run_batch / run_batch_by_tactic: every selected candidate runs regardless
+  of prior results (the original behavior).
+- run_state_driven: consults state_rules.py's hand-curated requires/provides
+  tags before each candidate -- skips ones whose requirements the current
+  ScenarioState doesn't meet (logging why), and feeds successful runs'
+  provides-effects (e.g. credentials found in stdout) back into state so
+  later candidates in the same run can depend on them. See state_rules.py's
+  docstring for the honest scope caveat: the safety-filtered pool has very
+  few real requires-gated candidates today (no cross-target lateral-movement
+  tests survive the filter), so this mostly proves the mechanism and
+  populates state for real, rather than demonstrating dramatic branching.
 """
 from __future__ import annotations
 
 import argparse
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -25,6 +34,7 @@ if __package__ in (None, ""):
     from breachchain.mapping import build_coverage, save_coverage
     from breachchain.report import render_report_html, report_filename, run_timestamp, save_report
     from breachchain.state import ScenarioState
+    from breachchain.state_rules import provides_for, requires_for
     from breachchain.tactic_mapping import group_by_tactic, load_mapping
 else:
     from .art_loader import AtomicTest, load_candidates
@@ -32,6 +42,7 @@ else:
     from .mapping import build_coverage, save_coverage
     from .report import render_report_html, report_filename, run_timestamp, save_report
     from .state import ScenarioState
+    from .state_rules import provides_for, requires_for
     from .tactic_mapping import group_by_tactic, load_mapping
 
 # Standard ATT&CK enterprise-matrix tactic order (attacker's typical progression).
@@ -143,6 +154,84 @@ def run_batch_by_tactic(
     return results, state, step_tactics
 
 
+@dataclass
+class SkippedCandidate:
+    technique_id: str
+    test_name: str
+    guid: str
+    tactic: str
+    missing_requirements: list[str]
+
+
+def run_state_driven(
+    candidates: list[AtomicTest],
+    target: Target,
+    tactic_map: dict[str, list[str]],
+    run_cleanup: bool = True,
+    timeout: int = 60,
+    initial_state: ScenarioState | None = None,
+) -> tuple[list[ExecutionResult], ScenarioState, list[str], list[SkippedCandidate], list[str]]:
+    """Tactic-ordered execution (same grouping as run_batch_by_tactic), but
+    each candidate is gated on state_rules.requires_for() against the
+    ScenarioState accumulated so far, and successful runs feed
+    state_rules.provides_for() back into that state. See state_rules.py's
+    docstring for what's actually gated today (little, honestly) vs. what
+    this mechanism is for going forward (multi-target lateral movement).
+
+    initial_state lets a caller seed state before ART execution starts --
+    e.g. pipeline.py records a brute-forced credential here so it's not lost
+    the moment it's used to open the SSH connection (previously it only lived
+    in a local variable and never reached ScenarioState at all).
+
+    Returns (results, state, step_tactics, skipped, dead_end_tactics) --
+    skipped candidates never ran (their requirements weren't met), and
+    dead_end_tactics lists tactics where every candidate was skipped.
+    """
+    grouped = group_by_tactic(candidates, tactic_map)
+    ordered_tactics = [t for t in TACTIC_ORDER if t in grouped]
+    ordered_tactics += [t for t in grouped if t not in ordered_tactics]
+
+    state = initial_state if initial_state is not None else ScenarioState()
+    results: list[ExecutionResult] = []
+    step_tactics: list[str] = []
+    skipped: list[SkippedCandidate] = []
+    dead_end_tactics: list[str] = []
+
+    for tactic in ordered_tactics:
+        tests = grouped[tactic]
+        logger.info(f"=== 전술 단계: {tactic} ({len(tests)}개 후보) ===")
+        ran_any = False
+        for test in tests:
+            requires = requires_for(test.technique_id, test.guid)
+            if requires and not state.eligible(requires, target.name):
+                missing = [r for r in requires if not state.meets(r, target.name)]
+                logger.info(f"[SKIP] {test.technique_id} {test.test_name} -- 미충족 조건: {missing}")
+                skipped.append(SkippedCandidate(test.technique_id, test.test_name, test.guid, tactic, missing))
+                continue
+
+            r = execute(test, target, run_cleanup=run_cleanup, timeout=timeout)
+            _log_step(r)
+            results.append(r)
+            step_tactics.append(tactic)
+            state.record_step(r.technique_id)
+            ran_any = True
+
+            if r.success:
+                provides = provides_for(test.technique_id, test.guid)
+                if provides:
+                    before = len(state.credentials)
+                    state.apply_provides(provides, r.stdout, target.name, r.technique_id)
+                    gained = len(state.credentials) - before
+                    if gained:
+                        logger.info(f"    -> state 갱신: 자격정보 {gained}개 확보")
+
+        if tests and not ran_any:
+            logger.info(f"=== 전술 단계 {tactic}: 후보 {len(tests)}개 전부 조건 미충족으로 건너뜀 (dead end) ===")
+            dead_end_tactics.append(tactic)
+
+    return results, state, step_tactics, skipped, dead_end_tactics
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -162,6 +251,7 @@ def main() -> int:
     parser.add_argument("--skip-check", action="store_true", help="skip the connectivity pre-check (not recommended)")
     parser.add_argument("--connect-timeout", type=int, default=10)
     parser.add_argument("--by-tactic", action="store_true", help="group and run candidates tactic-by-tactic (needs runs/tactic_mapping.json)")
+    parser.add_argument("--state-driven", action="store_true", help="tactic-ordered + gate each candidate on state_rules.py requires/provides (implies --by-tactic)")
     args = parser.parse_args()
 
     limit = None if args.limit == 0 else args.limit
@@ -195,7 +285,14 @@ def main() -> int:
     logger.info(f"breachchain ART batch 시작: {len(selected)}개 후보, target={target.name}({target.mode})")
 
     step_tactics = None
-    if args.by_tactic:
+    skipped = None
+    dead_end_tactics = None
+    if args.state_driven:
+        tactic_map = load_mapping()
+        results, state, step_tactics, skipped, dead_end_tactics = run_state_driven(
+            selected, target, tactic_map, run_cleanup=not args.no_cleanup, timeout=args.timeout
+        )
+    elif args.by_tactic:
         tactic_map = load_mapping()
         results, state, step_tactics = run_batch_by_tactic(
             selected, target, tactic_map, run_cleanup=not args.no_cleanup, timeout=args.timeout
@@ -209,7 +306,8 @@ def main() -> int:
     save_coverage(coverage, RUNS_DIR / "coverage.json")
 
     report_html = render_report_html(
-        results, state, coverage, scenario_name="breachchain ART batch run", step_tactics=step_tactics
+        results, state, coverage, scenario_name="breachchain ART batch run", step_tactics=step_tactics,
+        skipped=skipped, dead_end_tactics=dead_end_tactics,
     )
     report_path = REPORTS_DIR / report_filename(ts)
     save_report(report_html, report_path)

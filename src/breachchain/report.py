@@ -88,6 +88,8 @@ def render_report_html(
     vuln_scan: dict | None = None,
     kisa: dict | None = None,
     fingerprint: dict | None = None,
+    skipped: list | None = None,
+    dead_end_tactics: list[str] | None = None,
 ) -> str:
     total = len(results)
     succeeded = sum(1 for r in results if r.success)
@@ -266,6 +268,26 @@ def render_report_html(
         if not r.success and r.stderr.strip():
             parts.append(f"<pre class=\"err\">{_esc(r.stderr.strip())}</pre>")
         parts.append("</div>")
+
+    if dead_end_tactics:
+        parts.append(
+            "<p class=\"meta\">막힌 전술 단계(dead end) — 후보는 있었지만 현재 상태(state)로는 조건을 충족하는 게 하나도 없어 전부 건너뜀: "
+            + ", ".join(_esc(t) for t in dead_end_tactics) + "</p>"
+        )
+
+    if skipped:
+        parts.append("<h2>건너뛴 후보 (상태 조건 미충족)</h2>")
+        parts.append(
+            "<p class=\"meta\">requires 조건(state_rules.py)을 현재 state가 만족하지 못해 실행하지 않은 후보입니다. "
+            "실패가 아니라 \"아직 조건이 안 된다\"는 뜻입니다.</p>"
+        )
+        parts.append("<table><tr><th>전술</th><th>기법</th><th>이름</th><th>미충족 조건</th></tr>")
+        for s in skipped:
+            parts.append(
+                f"<tr><td>{_esc(s.tactic)}</td><td>{_esc(s.technique_id)}</td><td>{_esc(s.test_name)}</td>"
+                f"<td>{_esc(', '.join(s.missing_requirements))}</td></tr>"
+            )
+        parts.append("</table>")
 
     parts.append("<h2>누적 상태</h2>")
     parts.append("<h3>확보 자산</h3><ul>")

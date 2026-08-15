@@ -1,0 +1,205 @@
+<mxfile host="app.diagrams.net" modified="2026-08-15T00:00:00.000Z" agent="breachchain" version="24.0.0" type="device">
+  <diagram name="breachchain pipeline" id="breachchain-pipeline">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===================== MAIN SPINE ===================== -->
+        <mxCell id="n1" value="시작: 대상 IP 입력&lt;br&gt;&lt;i&gt;pipeline.py&lt;/i&gt;" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="40" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n2" value="정찰&lt;br&gt;&lt;i&gt;recon.py&lt;/i&gt; — 포트 스캔" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n3" value="CVE 매칭&lt;br&gt;&lt;i&gt;vuln_scan.py&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="230" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n4" value="자격정보&lt;br&gt;보유?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="330" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n5" value="브루트포싱&lt;br&gt;&lt;i&gt;bruteforce.py&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="345" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n6" value="성공?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="440" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n7" value="종료&lt;br&gt;정찰/브루트포싱 결과만&lt;br&gt;리포트 생성 후 종료" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="620" y="450" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n8" value="SSH 접속 확인&lt;br&gt;&lt;i&gt;check_connection()&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="560" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n9" value="대상 식별&lt;br&gt;&lt;i&gt;device_fingerprint.py&lt;/i&gt;&lt;br&gt;OS/커널/보드모델 → 임베디드 여부 판정" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="660" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n10" value="KISA CIIP 진단&lt;br&gt;&lt;i&gt;kisa_runner.py&lt;/i&gt;&lt;br&gt;(Unix 67개 항목)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="780" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n11" value="ART 후보 로드 + 전술별 그룹화&lt;br&gt;&lt;i&gt;art_loader.py / tactic_mapping.py&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="890" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n12" value="상태 기반 실행 루프 진입 →" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1000" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n13" value="통합 리포트 생성&lt;br&gt;&lt;i&gt;report.py&lt;/i&gt;&lt;br&gt;state.json / coverage.json / report.html" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="2030" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n14" value="종료" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2140" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== LOOP CONTAINER ===================== -->
+        <mxCell id="cont" value="상태 기반 실행 루프 — art_runner.run_state_driven()&lt;br&gt;전술 순서: Reconnaissance → Resource Development → Initial Access → ... → Impact" style="rounded=1;dashed=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;verticalAlign=top;align=center;fontStyle=1;fontSize=13;spacingTop=10;" vertex="1" parent="1">
+          <mxGeometry x="380" y="980" width="480" height="1000" as="geometry" />
+        </mxCell>
+
+        <mxCell id="la" value="다음 전술 선택" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1030" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lb" value="전술 내 다음 후보 선택" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1110" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lc" value="requires&lt;br&gt;충족?&lt;br&gt;&lt;i&gt;state_rules.py&lt;/i&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1190" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ld" value="SKIP 기록&lt;br&gt;(사유 로깅)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="1210" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="le" value="절차 실행&lt;br&gt;&lt;i&gt;executor.py&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1320" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lf" value="성공?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1420" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lg" value="provides 적용&lt;br&gt;state 갱신&lt;br&gt;(credential 등)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="1430" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lh" value="전술 내&lt;br&gt;후보 남음?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1550" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="li" value="전술 전체&lt;br&gt;SKIP?&lt;br&gt;(dead end)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1680" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lj" value="dead-end 기록" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="1700" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lk" value="다음 전술&lt;br&gt;있음?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1810" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ll" value="루프 종료" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1930" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== LEGEND ===================== -->
+        <mxCell id="leg" value="범례" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;verticalAlign=top;align=center;fontStyle=1;fontSize=13;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="900" y="40" width="220" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="시작 / 정상 종료" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="80" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="처리 단계 (모듈 호출)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="125" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="분기 판단" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="170" width="190" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="루프 진입/종료 표시" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="915" y="225" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="state 갱신 (성공 결과 반영)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="270" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="SKIP (조건 미충족)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="315" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg7" value="예외/조기 종료" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="360" width="190" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg8" value="dead-end (전술 전체 SKIP)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="915" y="405" width="190" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== EDGES: main spine ===================== -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n1" target="n2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n2" target="n3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n3" target="n4"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e4" value="예" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="n4" target="n8">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="160" y="540" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="n4" target="n5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n5" target="n6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="성공" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="n6" target="n8">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="480" y="590" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="실패" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="n6" target="n7"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n8" target="n9"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n9" target="n10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n10" target="n11"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n11" target="n12"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="n12" target="la"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1" source="ll" target="n13">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="160" y="1955" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="n13" target="n14"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ===================== EDGES: loop internals ===================== -->
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="la" target="lb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="lb" target="lc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e18" value="충족" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lc" target="le"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" value="미충족" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lc" target="ld"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="ld" target="lh">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="765" y="1595" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="le" target="lf"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e22" value="성공" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lf" target="lg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e23" value="실패" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lf" target="lh"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="lg" target="lh">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="765" y="1595" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e25" value="예 (있음)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="lh" target="lb">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="400" y="1595" /><mxPoint x="400" y="1135" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e26" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lh" target="li"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e27" value="예" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="li" target="lj"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e28" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="li" target="lk">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="1855" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" edge="1" parent="1" source="lj" target="lk">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="800" y="1855" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e30" value="예 (있음)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="lk" target="la">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="400" y="1855" /><mxPoint x="400" y="1055" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e31" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="lk" target="ll"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

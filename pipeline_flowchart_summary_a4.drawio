@@ -1,0 +1,123 @@
+<mxfile host="app.diagrams.net" agent="breachchain">
+  <diagram name="breachchain pipeline (summary, A4 landscape)" id="breachchain-pipeline-summary">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="light-dark(#ffffff, #121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;" value="breachchain 파이프라인 — 요약 흐름 (pipeline.py)" vertex="1">
+          <mxGeometry height="30" width="600" x="20" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#666666;" value="상세 실행 루프(전술별 requires/provides 게이팅)는 pipeline_flowchart_dean.drawio 참고" vertex="1">
+          <mxGeometry height="20" width="600" x="20" y="45" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== MAIN ROW ===================== -->
+        <mxCell id="s1" parent="1" style="rounded=0;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="시작" vertex="1">
+          <mxGeometry height="60" width="80" x="20" y="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="정찰 + CVE 매칭&lt;br&gt;&lt;i&gt;recon.py / vuln_scan.py&lt;/i&gt;" vertex="1">
+          <mxGeometry height="90" width="150" x="115" y="135" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s3" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;rounded=0;" value="자격정보&lt;br&gt;보유?" vertex="1">
+          <mxGeometry height="110" width="140" x="280" y="125" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="접속 확인 + 대상 식별&lt;br&gt;&lt;i&gt;check_connection() / device_fingerprint.py&lt;/i&gt;" vertex="1">
+          <mxGeometry height="90" width="150" x="435" y="135" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="KISA CIIP 진단&lt;br&gt;&lt;i&gt;kisa_runner.py&lt;/i&gt;&lt;br&gt;(Unix 67개 항목)" vertex="1">
+          <mxGeometry height="90" width="140" x="600" y="135" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" value="상태 기반 ART 실행 루프&lt;br&gt;&lt;i&gt;art_runner.run_state_driven()&lt;/i&gt;&lt;br&gt;전술 순서대로: requires 게이팅 → 실행 → provides로 state 갱신" vertex="1">
+          <mxGeometry height="110" width="190" x="755" y="125" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="통합 리포트 생성&lt;br&gt;&lt;i&gt;report.py&lt;/i&gt;" vertex="1">
+          <mxGeometry height="90" width="150" x="960" y="135" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s8" parent="1" style="rounded=0;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="종료" vertex="1">
+          <mxGeometry height="60" width="80" x="1000" y="290" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== BRANCH: 자격정보 없을 때 ===================== -->
+        <mxCell id="b1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="브루트포싱&lt;br&gt;&lt;i&gt;bruteforce.py&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="140" x="280" y="320" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b2" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;rounded=0;" value="성공?" vertex="1">
+          <mxGeometry height="100" width="140" x="280" y="430" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b3" parent="1" style="rounded=0;arcSize=50;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" value="종료: 정찰/브루트포싱&lt;br&gt;결과만 리포트 후 종료" vertex="1">
+          <mxGeometry height="70" width="190" x="480" y="445" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== LEGEND (bottom, horizontal) ===================== -->
+        <mxCell id="leg" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingTop=6;spacingLeft=10;" value="범례" vertex="1">
+          <mxGeometry height="90" width="1130" x="20" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" parent="1" style="rounded=0;arcSize=50;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="시작/정상 종료" vertex="1">
+          <mxGeometry height="30" width="140" x="35" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="처리 단계 (모듈 호출)" vertex="1">
+          <mxGeometry height="30" width="160" x="185" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;rounded=0;" value="분기 판단" vertex="1">
+          <mxGeometry height="30" width="120" x="355" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=1;" value="반복 실행 루프 (상세는 별도 다이어그램)" vertex="1">
+          <mxGeometry height="30" width="260" x="485" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" parent="1" style="rounded=0;arcSize=50;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" value="예외/조기 종료" vertex="1">
+          <mxGeometry height="30" width="140" x="755" y="740" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== EDGES ===================== -->
+        <mxCell id="e1" edge="1" parent="1" source="s1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" target="s4" value="예">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" target="b1" value="아니오">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="b1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="b2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;exitX=1;exitY=0.3;entryX=0;entryY=0.8;" target="s4" value="성공">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="420" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="b2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;fontStyle=1;" target="b3" value="실패">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="s5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="s5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="s6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="s6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;strokeColor=#9673a6;strokeWidth=2;" target="s7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="s7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" target="s8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

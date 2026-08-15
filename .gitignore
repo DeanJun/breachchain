@@ -8,3 +8,5 @@ runs/*.json
 reports/
 logs/
 vendor/
+jpg_exports/
+*.pdf
